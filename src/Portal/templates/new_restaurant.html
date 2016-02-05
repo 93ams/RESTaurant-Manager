@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% from 'forms.html' import input %}
+{% block content %}
+    <dev class="jumbotron text-center">
+        {% if error %}
+            <p>{{ error }}</p>
+        {% endif %}
+        <form action="/html/new_restaurant" method="post" >
+            <p>Restaurant Name: {{ input('name') }}</p>
+            <p>        Address: {{ input('address') }}</p>
+            <p>{{ input('register', type='submit', value='Register') }}</p>
+        </form>
+    </dev>
+{% endblock %}

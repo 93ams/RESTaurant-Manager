@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+    <dev>
+        {% if restaurants %}
+            <h1>Restaurants: </h1>
+            {% for r_id in restaurants %}
+                <p> {{ restaurants[r_id].name }} </p>
+                <p> @ {{ restaurants[r_id].address }} </p>
+            {% endfor %}
+        {% else %}
+            {% if user %}
+                <h1>No restaurant is registered, be the first</h1>
+                <p><a href="/html/new_restaurant">Click Here</a></p>
+            {% else %}
+                <h1>No restaurant is registered, register be the first</h1>
+                <p><a href="/register">Click Here</a></p>
+            {% endif %}
+        {% endif %}
+    </dev>
+{% endblock %}

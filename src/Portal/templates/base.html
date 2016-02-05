@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>RESTaurant Manager</title>
+        <!--<link rel="icon" href="static/imgs/favicon.ico">-->
+        <link rel="stylesheet" href="http://localhost:8000/static/bootstrap/css/bootstrap.min.css">
+        <link rel="stylesheet" href="http://localhost:8000/static/css/styles.css">
+    </head>
+    <body>
+        {% include 'navbar.html' %}
+        <dev class="container">
+            {% block content %}
+            {% endblock %}
+        </dev>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+        <script src="http://localhost:8000/static/bootstrap/js/bootstrap.min.js"></script>
+    </body>
+</html>

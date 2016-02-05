@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% from 'forms.html' import input %}
+{% block content %}
+    <dev class="jumbotron text-center">
+        {% if error %}
+            <p>{{ error }}</p>
+        {% endif %}
+        <form method="post" action="/login">
+            <p>Username: {{ input('username') }}</p>
+            <p>Password: {{ input('password', type='password') }}</p>
+            <p>{{ input('login', type='submit', value='Login') }}</p>
+        </form>
+    </dev>
+{% endblock %}
