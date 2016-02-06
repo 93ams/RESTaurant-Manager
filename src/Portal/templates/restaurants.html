@@ -3,10 +3,13 @@
     <dev>
         {% if restaurants %}
             <h1>Restaurants: </h1>
-            {% for r_id in restaurants %}
-                <p> {{ restaurants[r_id].name }} </p>
-                <p> @ {{ restaurants[r_id].address }} </p>
+            {% for restaurant in restaurants %}
+                <p> {{ restaurant.Name }} </p>
+                <p> @ {{ restaurant.Address }} </p>
             {% endfor %}
+            {% if user %}
+                <p>Add more: <a href="/html/new_restaurant">Click Here</a></p>
+            {% endif %}
         {% else %}
             {% if user %}
                 <h1>No restaurant is registered, be the first</h1>

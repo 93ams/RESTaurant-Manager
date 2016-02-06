@@ -1,6 +1,8 @@
+import json
 import logging
 import mimetypes
 import os
+import requests
 import uuid
 import webapp2
 from webapp2_extras import auth
@@ -13,11 +15,6 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 # with open('config.json') as d:
 # 	config = json.load(d)
-
-#substituir pela base de dados
-
-users = {}
-restaurants = {}
 
 ###### error handlers ##############
 
@@ -35,8 +32,6 @@ def handle_500(request, response, exception):
     logging.exception(exception)
     response.write('A server error occurred!')
     response.set_status(500)
-
-
 
 ########## Static Files ############
 
@@ -93,7 +88,6 @@ class BaseHandler(webapp2.RequestHandler):
 
 class IndexHandler(BaseHandler):
     def get(self):
-
         if hasattr(self, "session"):
             session = self.session
             user = session.get('user', None)
@@ -137,9 +131,7 @@ class LoginHandler(BaseHandler):
 
     def post(self):
         try:
-            if self.request.POST.get("register", None):
-                self.redirect("/register")
-            elif self.request.POST.get("login", None): #depois logo me preocupo com a seguranca
+            if self.request.POST.get("login", None): #depois logo me preocupo com a seguranca
                 if hasattr(self, "session"):
                     session = self.session
                     user = session.get("user", None)
@@ -149,10 +141,12 @@ class LoginHandler(BaseHandler):
                         username = str(self.request.POST.get("username", None))
                         password = str(self.request.POST.get("password", None))
                         if username:
-                            user = users.get(username, None)
+                            r = requests.get("http://localhost:7000/users/" + username)
+                            user = json.loads(r.text)
+                            print user
                             if password:
                                 if user:
-                                    if user == password:
+                                    if user.get("password", None) == password:
                                         self.session["user"] = username
                                         self.redirect("/")
                                     else:
@@ -206,7 +200,8 @@ class RegisterHandler(BaseHandler):
                 password = self.request.POST.get("password", None)
 
                 if username:
-                    user = users.get(str(username), None)
+                    r = requests.get("http://localhost:7000/users/" + username)
+                    user = json.loads(r.text)
                     if password:
                         if user:
                             context_dict = {"register": True,
@@ -214,8 +209,13 @@ class RegisterHandler(BaseHandler):
                             self.response.write(template("register.html", context_dict))
                         else:
                             if hasattr(self, "session"):
+                                data = {
+                                    "Username": username,
+                                    "Password": password
+                                }
+                                r = requests.post("http://localhost:7000/users", data = data)
+                                print r.text
                                 self.session["user"] = username
-                                users[username] = password
                             else:
                                 print "Register POST"
                                 print "no session"
@@ -243,9 +243,20 @@ class RestaurantHttpHandler(BaseHandler):
             context_dict = {}
             if user:
                 context_dict["user"] = user
-            context_dict["restaurants"] = restaurants
-            self.response.write(template("restaurants.html", context_dict))
-
+            if RestaurantID:
+                r = requests.get("http://localhost:7000/restaurants/" + RestaurantID)
+            elif RestaurantName:
+                r = requests.get("http://localhost:7000/restaurants/search/" + RestaurantName)
+            else:
+                r = requests.get("http://localhost:7000/restaurants" )
+            try:
+                restaurants = json.loads(r.text)
+                context_dict["restaurants"] = restaurants
+                print context_dict
+                self.response.write(template("restaurants.html", context_dict))
+            except Exception as e:
+                print "Restaurant Http GET"
+                print e
         else:
             print "Restaurant Http GET"
 
@@ -257,7 +268,6 @@ class NewRestaurantHandler(BaseHandler):
             if user:
                 context_dict["user"] = user
             self.response.write(template("new_restaurant.html", context_dict))
-
         else:
             print "NewRestaurant GET"
 
@@ -273,11 +283,12 @@ class NewRestaurantHandler(BaseHandler):
                     address = self.request.POST.get("address", None)
                     if name:
                         if address:
-                            new_restaurant = {}
-                            new_restaurant["name"] = name
-                            new_restaurant["address"] = address
-                            id = uuid.uuid4()
-                            restaurants[id] = new_restaurant
+                            data = {
+                                "Name": name,
+                                "Address": address
+                            }
+                            r = requests.post("http://localhost:7000/restaurants", data=data)
+                            print r.text
                             self.redirect("/html/restaurants")
                         else:
                             context_dict["error"] = "Please insert an address"
@@ -303,24 +314,45 @@ class NewRestaurantHandler(BaseHandler):
 
 class RestaurantJsonHandler(BaseHandler):
     def get(self, RestaurantName = None, RestaurantID = None):
-        if hasattr(self, "session"):
-            user = self.session.get("user", None)
-            if user:
-                pass
-            else:
-                pass
+        if RestaurantID:
+            r = requests.get("http://localhost:7000/restaurants/ " + ResturantID)
+        elif RestaurantName:
+            r = requests.get("http://localhost:7000/restaurants/search/" + RestaurantName)
         else:
-            print "Restaurant Json GET"
+            r = requests.get("http://localhost:7000/restaurants")
+        try:
+            data = json.loads(r.text)
+            print data
+            self.response.write(data)
+        except Exception as e:
+            print e
 
     def post(self):
         if hasattr(self, "session"):
             user = self.session.get("user", None)
             if user:
-                pass
+                try:
+                    data = json.loads(self.request.body)
+                    id = data.get("RestaurantID", None)
+                    name = data.get("Name", None)
+                    address = data.get("Address", None)
+                    if id and name and address:
+                        r = requests.get("http://localhost:7000/restaurants/" + id)
+                        print json.loads(r.text)
+                        r = requests.post("http://localhost:7000/restaurants", data=json.dumps(data))
+                        print r.text
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
+                except Exception as e:
+                    print "Restaurant Json POST"
+                    print e
+                    self.response.write("FAIL")
             else:
-                pass
+                self.response.write("FAIL")
         else:
             print "Restaurant Json POST"
+            self.response.write("FAIL")
 
     def put(self, RestaurantID = None):
         if hasattr(self, "session"):
@@ -336,12 +368,20 @@ class RestaurantJsonHandler(BaseHandler):
         if hasattr(self, "session"):
             user = self.session.get("user", None)
             if user:
-                pass
+                try:
+                    r = requests.get("http://localhost:7000/restaurants/" + RestaurantID)
+                    print json.loads(r.text)
+                    # r = requests.delete("http://localhost:7000/restaurants/" + RestaurantID)
+                    self.response.write("OK")
+                except Exception as e:
+                    print "Restaurant Json DELETE"
+                    print e
+                    self.response.write("FAIL")
             else:
-                pass
+                self.response.write("FAIL")
         else:
             print "Restaurant Json DELETE"
-
+            self.response.write("FAIL")
 
 ############## Routes ###############
 

@@ -22,5 +22,6 @@ def template(filename, context_dict = {}):
         template = env.get_template(filename)
         return template.render(context_dict)
     except Exception as e:
+        print "Template"
         print e
         return None

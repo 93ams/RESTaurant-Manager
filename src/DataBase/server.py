@@ -1,6 +1,8 @@
 import webapp2
 import json
-from database import Database as db
+import logging
+import uuid
+from database import Database
 
 methods = {
             "Help": "/help",
@@ -8,8 +10,7 @@ methods = {
             "Restaurants": "/restaurants"
         }
 
-users = {}
-restaurants = {}
+db = Database()
 
 ###### error handlers ##############
 
@@ -28,7 +29,6 @@ def handle_500(request, response, exception):
     response.write('A server error occurred!')
     response.set_status(500)
 
-
 class Index(webapp2.RequestHandler):
     def get(self):
         self.redirect("/help")
@@ -44,8 +44,10 @@ class Users(webapp2.RequestHandler):
     def get(self, Username = None):
         try:
             if Username:
-                self.response.write(json.dumps(users.get(Username, {})))
+                user = db.users.get(Username)
+                self.response.write(json.dumps(user))
             else:
+                users = db.users.get()
                 self.response.write(json.dumps(users))
         except Exception as e:
             print "User GET"
@@ -57,14 +59,21 @@ class Users(webapp2.RequestHandler):
 
     def post(self):
         try:
-            print self.request.body
-            content = json.loads(self.request.body)
-            print content
-            username = content.get("username", None)
-            password = content.get("password", None)
+            username = self.request.POST.get("Username", None)
+            password = self.request.POST.get("Password", None)
+            if not (username or password):
+                content = json.loads(self.request.body)
+                username = content.get("Username", None)
+                password = content.get("Password", None)
+
             if username and password:
-                users[username] = password
-                self.response.write("OK")
+                if not db.users.get(username):
+                    if db.users.insert(username, password):
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
+                else:
+                    self.response.write("FAIL")
             else:
                 self.response.write("FAIL")
         except Exception as e:
@@ -74,7 +83,10 @@ class Users(webapp2.RequestHandler):
 
     def put(self, Username):
         try:
-
+            content = json.loads(self.request.body)
+            password = content.get("password", None)
+            if password:
+                pass
             self.response.write("OK")
         except Exception as e:
             print "User PUT"
@@ -85,8 +97,10 @@ class Users(webapp2.RequestHandler):
         try:
             if Username:
                 if users.get(Username, None):
-                    del users[Username]
-                    self.response.write("OK")
+                    if db.users.delete(Username):
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
                 else:
                     self.response.write("FAIL")
             else:
@@ -100,16 +114,17 @@ class Restaurants(webapp2.RequestHandler):
     def get(self, RestaurantName = None, RestaurantID = None):
         try:
             if RestaurantID:
-                self.response.write(json.dumps(restaurants.get(RestaurantID, {})))
+                restaurant = db.restaurants.get(RestaurantID = RestaurantID)
+                self.response.write(json.dumps(restaurant))
             elif RestaurantName:
-                restaurant_list = []
-                for restaurant in restaurants:
-                    if restaurant["name"] == RestaurantName:
-                        restaurant_list.append(restaurant)
-                self.response.write(json.dumps(restaurants_list))
-            else:
+                restaurants = db.restaurants.get(RestaurantName = RestaurantName)
                 self.response.write(json.dumps(restaurants))
-        except:
+            else:
+                restaurants = db.restaurants.get()
+                self.response.write(json.dumps(restaurants))
+        except Exception as e:
+            print "Restaurants GET"
+            print e
             if RestaurantID:
                 self.response.write(json.dumps({}))
             else:
@@ -117,41 +132,62 @@ class Restaurants(webapp2.RequestHandler):
 
     def post(self):
         try:
-            content = json.loads(self.request.body())
-            name = content.get("name", None)
-            address = content.get("address", None)
+            name = self.request.POST.get("Name", None)
+            address = self.request.POST.get("Address", None)
+            if not (name or address):
+                content = json.loads(self.request.body)
+                name = content.get("Name", None)
+                address = content.get("Address", None)
 
             if name and address:
-                new_restaurant = {}
-                new_restaurant["name"] = name
-                new_restaurant["address"] = address
-                id = uuid.uuid4()
-                restaurants[id] = new_restaurant
-                self.response.write("OK")
+                id = str(uuid.uuid4())
+                if db.restaurants.insert(id, name, address):
+                    self.response.write("OK")
+                else:
+                    self.response.write("FAIL")
             else:
                 self.response.write("FAIL")
-        except:
+        except Exception as e:
+            print "Restaurants POST"
+            print e
             self.response.write("FAIL")
 
     def put(self, RestaurantID):
         try:
+            content = json.loads(self.request.body)
+            name = content.get("name", None)
+            address = content.get("address", None)
+
+            if name:
+                pass
+
+            if address:
+                pass
 
             self.response.write("OK")
-        except:
+        except Exception as e:
+            print "Restaurants PUT"
+            print e
             self.response.write("FAIL")
 
     def delete(self, RestaurantID = None):
         try:
             if ResturantID:
                 if restaurants.get(RestaurantID, None):
-                    self.response.("OK")
+                    if db.restaurants.delete(ResturantID):
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
                 else:
                     self.response.write("FAIL")
             else:
                 restaurants = {}
-                self.response.("OK")
+                print db.restaurants.delete()
+                self.response.write("OK")
 
-        except:
+        except Exception as e:
+            print "Restaurants DELETE"
+            print e
             self.response.write("FAIL")
 
 routes = [
@@ -161,7 +197,7 @@ routes = [
     webapp2.Route(r'/users/<Username>', Users),
     webapp2.Route(r'/restaurants', Restaurants),
     webapp2.Route(r'/restaurants/<RestaurantID>', Restaurants),
-    webapp2.Route(r'/restaurants/<RestaurantName>', Restaurants),
+    webapp2.Route(r'/restaurants/search/<RestaurantName>', Restaurants),
 ]
 
 config = {}

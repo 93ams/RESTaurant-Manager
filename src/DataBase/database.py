@@ -1,106 +1,185 @@
-from ming import Session, create_datastore
-from ming import Document, Field, schema
+#!/usr/bin/env python
+from ming import create_datastore
+from ming.odm import ThreadLocalODMSession
 
-class User(Document):
-     class __mongometa__:
+session = ThreadLocalODMSession(
+bind = create_datastore('mongodb://localhost:27017/RESTaurant_Manager')
+)
+
+from ming import schema
+from ming.odm import MappedClass
+from ming.odm import FieldProperty, ForeignIdProperty
+
+class User(MappedClass):
+    class __mongometa__:
         session = session
         name = 'user'
 
-    _id = Field(schema.ObjectId)
-    username = Field(str)
-    password = Field(str)
+    _id = FieldProperty(schema.ObjectId)
+    username = FieldProperty(schema.String(required=True))
+    password = FieldProperty(schema.String(required=True))
 
-class Restaurant(Document):
-     class __mongometa__:
+class Restaurant(MappedClass):
+    class __mongometa__:
         session = session
         name = 'restaurant'
 
-    _id = Field(schema.ObjectId)
-    name = Field(str)
-    address = Field(str)
+    _id = FieldProperty(schema.ObjectId)
+    restaurant_id = FieldProperty(schema.String(required=True))
+    name = FieldProperty(schema.String(required=True))
+    address = FieldProperty(schema.String(required=True))
+
+from ming.odm import Mapper
+Mapper.compile_all()
+
+def serializer(type, obj, multi=False):
+    try:
+        if type == "user":
+            if multi:
+                user_list = []
+                for o in obj:
+                    user_list.append({
+                        "username": str(o.username),
+                        "password": str(o.password)
+                    })
+                return user_list
+            else:
+                user = {}
+                if obj:
+                    user["username"] = str(obj.username)
+                    user["password"] =  str(obj.password)
+                return user
+        elif type == "restaurant":
+            if multi:
+                restaurant_list = []
+                for o in obj:
+                    restaurant_list.append({
+                        "RestaurantID": str(o.restaurant_id),
+                        "Name": str(o.name),
+                        "Address": str(o.address)
+                    })
+                return restaurant_list
+            else:
+                restaurant = {}
+                if obj:
+                    restaurant["RestaurantID"] = str(obj.restaurant_id)
+                    restaurant["Name"] = str(obj.name)
+                    restaurant["Address"] = str(obj.address)
+                return restaurant
+    except Exception as e:
+        print "Serializer"
+        print e
 
 class Users(object):
-    def __init__(self, db):
-        self.__collection = db.users
-
     def get(self, username = None):
         try:
             if username:
-                pass
+                user = User.query.get(username = username)
+                return serializer("user", user)
             else:
-                pass
-        except:
+                users = User.query.find({})
+                return serializer("user", users, multi=True)
+        except Exception as e:
+            print "Users Get"
+            print e
             if username:
                 return {}
             else:
                 return []
 
-    def insert(self, uid = None, username, password):
+    def insert(self, username, password):
         try:
-            user = User(_id = uid, username = username, password = password)
+            User(username = username, password = password)
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
-    def update(self, Username):
+    def update(self, Username, password = None):
         try:
+            user = User.query.get(username = Username)
+            if password:
+                user.password = password
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
-    def remove(self, Username = None):
+    def remove(self, username = None):
         try:
-            if Username:
-                pass
+            if username:
+                user = User.query.get(username = username)
+                user.delete()
             else:
-                pass
+                users = User.query.find({})
+                for user in users:
+                    user.delete()
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
 class Restaurants(object):
-    def __init__(self, db):
-        self.__collection = db.restaurants
-
-    def get(self):
+    def get(self, RestaurantID = None, RestaurantName = None):
         try:
-            pass
-        except:
-            return {}
+            if RestaurantID:
+                restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+                return serializer("restaurant", restaurant)
+            elif RestaurantName:
+                restaurants = Restaurant.query.find(name = RestaurantName)
+                return serializer("restaurant", restaurants, multi=True)
+            else:
+                restaurants = Restaurant.query.find({})
+                return serializer("restaurant", restaurants, multi=True)
 
-    def insert(self, name, address):
+        except Exception as e:
+            print e
+            if RestaurantID:
+                return {}
+            else:
+                return []
+
+    def insert(self, id, name, address):
         try:
-            restaurant = Restaurant(name = name, address = address)
+            restaurant = Restaurant(restaurant_id = id, name = name, address = address)
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
-    def update(self):
+    def update(self, RestaurantID, name = None, address = None):
         try:
+            restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+            if name:
+                restaurant.name = name
+            if address:
+                restaurant.address = address
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
     def remove(self, RestaurantID = None):
         try:
             if RestaurantID:
-                pass
+                restaurant = Restaurant.query.get(_id = RestaurantID)
+                restaurant.delete()
             else:
-                pass
+                restaurants = Restaurant.query.find({})
+                for restaurant in restaurants:
+                    restaurant.delete()
+            session.flush()
             return True
-        except:
+        except Exception as e:
+            print e
             return False
 
 class Database(object):
     def __init__(self):
-        bind = create_datastore('mongodb://localhost:27017/RESTaurant_Manager')
-        self.__db = Session(bind)
-        self.restaurants = Restaurants(self.__db)
-        self.users = Users(self.__db)
-
-def main():
-    db = Database()
-
-if __name__ == "__main__":
-    #test
-    main()
+        self.restaurants = Restaurants()
+        self.users = Users()
