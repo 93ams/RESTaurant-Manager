@@ -165,7 +165,7 @@ class Restaurants(object):
             else:
                 return []
 
-    def insert(self,restaurant):
+    def insert(self, restaurant):
         try:
             id = restaurant.get("restaurant_id", "")
             name = restaurant.get("name", "")

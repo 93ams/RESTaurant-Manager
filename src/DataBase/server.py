@@ -7,7 +7,9 @@ from database import Database
 methods = {
             "Help": "/help",
             "Users": "/users",
-            "Restaurants": "/restaurants"
+            "Restaurants": "/restaurants",
+            "Dishes": "/dishes",
+            "Ingredients": "/ingredients"
         }
 
 db = Database()
@@ -192,24 +194,94 @@ class Restaurants(webapp2.RequestHandler):
 
 class Dishes(webapp2.RequestHandler):
     def get(self, Name = None, RestaurantID = None):
-        pass
+        if RestaurantID:
+            if db.restaurants.get(ResturantID=RestaurantID):
+                if Name:
+                    dish = db.dishes.get(ResturantID=RestaurantID, Name=Name)
+                    self.response.write(json.dumps(dish))
+                else:
+                    dishes = db.dishes.get(ResturantID=RestaurantID)
+                    self.response.write(json.dumps(dishes))
+        else:
+            if Name:
+                dishes = db.dishes.get(Name=Name)
+            else:
+                dishes = db.dishes.get()
+            self.response.write(json.dumps(dishes))
 
-    def post(self):
+    def post(self, RestaurantID):
         name = self.request.POST.get("Name", None)
-        
-        if not (name or address):
+        cost = self.request.POST.get("Cost", None)
+        calories = self.request.POST.get("Calories", None)
+        if not (name or cost or calories):
             content = json.loads(self.request.body)
-            name = content.get("Name", None)
+            name = content.get("Name", "")
+            cost = content.get("Cost", -1.00)
+            calories = content.get("Calories", -1)
+            ingredients = content.get("Ingredients", [])
+        if name and cost and calories and RestaurantID:
+            new_dish = {
+                "restaurant": RestaurantID,
+                "name": name,
+                "cost": cost,
+                "calories": calories,
+                "ingredients": ingredients
+            }
+            if db.dishes.insert(new_dish):
+                self.response.write("OK")
+            else:
+                self.response.write("FAIL")
+        else:
+            self.response.write("FAIL")
 
     def put(self):
         pass
 
-    def delete(self):
-        pass
+    def delete(self, Name=None, RestaurantID=None):
+        if RestaurantID:
+            if db.restaurants.get(RestaurantID = RestaurantID):
+                if Name:
+                    if db.dishes.remove(RestaurantID = ResturantID, DishName=Name):
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
+                else:
+                    if db.dishes.remove(RestaurantID = RestaurantID):
+                        self.response.write("OK")
+                    else:
+                        self.response.write("FAIL")
+            else:
+                self.response.write("FAIL")
+        else:
+            if Name:
+                if db.dishes.remove(DishName=Name):
+                    self.response.write("OK")
+                else:
+                    self.response.write("FAIL")
+            else:
+                if db.dishes.remove():
+                    self.response.write("OK")
+                else:
+                    self.response.write("FAIL")
 
 class Ingredients(webapp2.RequestHandler):
     def get(self, Name = None, RestaurantID = None, Dish = None):
-        pass
+        if Name:
+            ingredient = db.ingredients.get(name = Name)
+            self.response.write(json.dumps(ingredient))
+        else:
+            if RestaurantID:
+                if db.restaurants.get(RestaurantID=RestaurantID):
+                    if Dish:
+                        ingredients = db.ingredients.get(RestaurantID=RestaurantID, Name=Dish)
+                    else:
+                        ingredients = db.ingredients.get(RestaurantID=RestaurantID)
+                else:
+                    ingredients = []
+            else:
+                ingredients = db.ingredients.get()
+            self.response.write(json.dumps(ingredients))
+
 
     def post(self):
         name = self.request.POST.get("Name", None)
@@ -218,11 +290,35 @@ class Ingredients(webapp2.RequestHandler):
             content = json.loads(self.request.body)
             name = content.get("Name", None)
 
-    def put(self):
+    def put(self, Name):
         pass
 
-    def delete(self):
-        pass
+    def delete(self, Name=None, RestaurantID=None, Dish=None):
+        if Name:
+            if db.ingredients.remove(name = Name):
+                self.response.write("OK")
+            else:
+                self.response.write("FAIL")
+        else:
+            if RestaurantID:
+                if db.restaurants.get(RestaurantID=RestaurantID):
+                    if Dish:
+                        if db.ingredients.remove(RestaurantID=RestaurantID, Name=Dish):
+                            self.response.write("OK")
+                        else:
+                            self.response.write("FAIL")
+                    else:
+                        if db.ingredients.remove(RestaurantID=RestaurantID):
+                            self.response.write("OK")
+                        else:
+                            self.response.write("FAIL")
+                else:
+                    self.response.write("FAIL")
+            else:
+                if db.ingredients.remove():
+                    self.response.write("OK")
+                else:
+                    self.response.write("FAIL")
 
 routes = [
     webapp2.Route(r'/', Index),

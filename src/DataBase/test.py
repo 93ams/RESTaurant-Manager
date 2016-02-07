@@ -1,17 +1,8 @@
 from database import Database
 from load_database import load
-import uuid
+import uuid, json, os
 
 def print_commands(detail=False):
-    print "Commands: "
-    print "G: Get"
-    print "I: Insert"
-    print "U: Update"
-    print "D: Delete"
-    print "L: Load"
-    print "R: Reset"
-    print "M: Menu"
-    print "E: Exit"
     if detail:
         print " ----------------------------------------------------------------------------------------------------------------------------- "
         print " | [cmd] | [collection] |                            [arguments]                                  ||       Description       | "
@@ -33,9 +24,20 @@ def print_commands(detail=False):
         print " |   D   |      D       | RestaurantID Dish                                                       || Deletes dish(s)         | "
         print " |   D   |      I       | Ingredient                                                              || Deletes ingredient(s)   | "
         print " |   L   |      -       | Filepath                                                                || Loads content from file | "
+        print " |   X   |      -       |                                                                         || Cleans the screen       | "
         print " |   R   |      -       |                                                                         || Resets the database     | "
         print " |   E   |      -       |                                                                         || Exit the program        | "
         print " ----------------------------------------------------------------------------------------------------------------------------- "
+    else:
+        print "Commands: "
+        print "G: Get"
+        print "I: Insert"
+        print "U: Update"
+        print "D: Delete"
+        print "L: Load"
+        print "R: Reset"
+        print "M: Menu"
+        print "E: Exit"
 
 def command(db, cmd, col):
     if cmd == "G":
@@ -378,11 +380,15 @@ def main():
             cmd = cmd.split()
             if cmd[0] in ["G","I","U","D"] and len(cmd) == 2:
                 if cmd[1] in ["U", "R", "D", "I"]:
-                    print command(db, cmd[0], cmd[1])
+                    res = command(db, cmd[0], cmd[1])
+                    if cmd[0] == "G":
+                        print json.dumps(res, indent=4)
             elif cmd[0] == "M" and len(cmd) == 1:
                 print_commands(True)
             elif cmd[0] == "L" and len(cmd) == 1:
                 load(db)
+            elif cmd[0] == "X" and len(cmd) == 1:
+                os.system('reset')
             elif cmd[0] == "R" and len(cmd) == 1:
                 db.users.remove()
                 db.restaurants.remove()
@@ -394,4 +400,6 @@ def main():
                 print_commands()
 
 if __name__ == "__main__":
+    os.system('reset')
     main()
+    os.system('reset')
