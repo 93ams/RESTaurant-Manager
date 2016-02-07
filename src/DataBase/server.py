@@ -190,14 +190,61 @@ class Restaurants(webapp2.RequestHandler):
             print e
             self.response.write("FAIL")
 
+class Dishes(webapp2.RequestHandler):
+    def get(self, Name = None, RestaurantID = None):
+        pass
+
+    def post(self):
+        name = self.request.POST.get("Name", None)
+        
+        if not (name or address):
+            content = json.loads(self.request.body)
+            name = content.get("Name", None)
+
+    def put(self):
+        pass
+
+    def delete(self):
+        pass
+
+class Ingredients(webapp2.RequestHandler):
+    def get(self, Name = None, RestaurantID = None, Dish = None):
+        pass
+
+    def post(self):
+        name = self.request.POST.get("Name", None)
+
+        if not (name or address):
+            content = json.loads(self.request.body)
+            name = content.get("Name", None)
+
+    def put(self):
+        pass
+
+    def delete(self):
+        pass
+
 routes = [
     webapp2.Route(r'/', Index),
     webapp2.Route(r'/help', Help),
+
     webapp2.Route(r'/users', Users),
     webapp2.Route(r'/users/<Username>', Users),
+
     webapp2.Route(r'/restaurants', Restaurants),
     webapp2.Route(r'/restaurants/<RestaurantID>', Restaurants),
     webapp2.Route(r'/restaurants/search/<RestaurantName>', Restaurants),
+
+    webapp2.Route(r'/dishes', Dishes),
+    webapp2.Route(r'/dishes/<Name>', Dishes),
+    webapp2.Route(r'/restaurants/<RestaurantID>/dishes', Dishes),
+    webapp2.Route(r'/restaurants/<RestaurantID>/dishes/<Name>', Dishes),
+
+    webapp2.Route(r'/ingredients', Ingredients),
+    webapp2.Route(r'/ingredients/<Name>', Ingredients),
+    webapp2.Route(r'/restaurants/<RestaurantID>/ingredients', Ingredients),
+    webapp2.Route(r'/restaurants/<RestaurantID>/dishes/<Dish>/ingredients', Ingredients),
+    webapp2.Route(r'/restaurants/<RestaurantID>/dishes/<Dish>/ingredients/<Name>', Ingredients),
 ]
 
 config = {}

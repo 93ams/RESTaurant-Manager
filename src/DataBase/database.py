@@ -1,34 +1,6 @@
 #!/usr/bin/env python
-from ming import create_datastore
-from ming.odm import ThreadLocalODMSession
-
-session = ThreadLocalODMSession(
-bind = create_datastore('mongodb://localhost:27017/RESTaurant_Manager')
-)
-
-from ming import schema
-from ming.odm import MappedClass
-from ming.odm import FieldProperty, ForeignIdProperty
-
-class User(MappedClass):
-    class __mongometa__:
-        session = session
-        name = 'user'
-
-    _id = FieldProperty(schema.ObjectId)
-    username = FieldProperty(schema.String(required=True))
-    password = FieldProperty(schema.String(required=True))
-
-class Restaurant(MappedClass):
-    class __mongometa__:
-        session = session
-        name = 'restaurant'
-
-    _id = FieldProperty(schema.ObjectId)
-    restaurant_id = FieldProperty(schema.String(required=True))
-    name = FieldProperty(schema.String(required=True))
-    address = FieldProperty(schema.String(required=True))
-
+from DbClasses import User, Restaurant, Dish, Ingredient, session
+from load_database import load
 from ming.odm import Mapper
 Mapper.compile_all()
 
@@ -66,9 +38,56 @@ def serializer(type, obj, multi=False):
                     restaurant["Name"] = str(obj.name)
                     restaurant["Address"] = str(obj.address)
                 return restaurant
+        elif type == "dish":
+            if multi:
+                dish_list = []
+                for o in obj:
+                    dish_list.append({
+                        "Name": str(o.name),
+                        "Rate": float(o.rate),
+                        "Cost": float(o.cost),
+                        "Calories": int(o.calories)
+                    })
+                return dish_list
+            else:
+                dish = {}
+                if obj:
+                    dish = {
+                        "Name": str(obj.name),
+                        "Rate": float(obj.rate),
+                        "Cost": float(obj.cost),
+                        "Calories": int(obj.calories)
+                    }
+                return dish
+        elif type == "ingredient":
+            if multi:
+                ingredient_list = []
+                for o in obj:
+                    ingredient_list.append({
+                        "Name": str(o.name),
+                        "Type": str(o.type),
+                        "Allergens": o.allergens,
+                        "Description": str(o.description)
+                    })
+                return ingredient_list
+            else:
+                ingredient = {}
+                if obj:
+                    ingredient = {
+                        "Name": str(obj.name),
+                        "Type": str(obj.type),
+                        "Allergens": obj.allergens,
+                        "Description": str(obj.description)
+                    }
+                return ingredient
+
     except Exception as e:
         print "Serializer"
         print e
+        if multi:
+            return []
+        else:
+            return {}
 
 class Users(object):
     def get(self, username = None):
@@ -87,10 +106,14 @@ class Users(object):
             else:
                 return []
 
-    def insert(self, username, password):
+    def insert(self, user):
         try:
-            User(username = username, password = password)
-            session.flush()
+            username = user.get("username", "")
+            password = user.get("password", "")
+            fid = user.get("fid", "")
+            if username and password:
+                User(username = username, password = password, fid = fid, manager=False)
+                session.flush()
             return True
         except Exception as e:
             print e
@@ -142,10 +165,14 @@ class Restaurants(object):
             else:
                 return []
 
-    def insert(self, id, name, address):
+    def insert(self,restaurant):
         try:
-            restaurant = Restaurant(restaurant_id = id, name = name, address = address)
-            session.flush()
+            id = restaurant.get("restaurant_id", "")
+            name = restaurant.get("name", "")
+            address = restaurant.get("address", "")
+            if id and name and address:
+                Restaurant(restaurant_id = id, name = name, address = address)
+                session.flush()
             return True
         except Exception as e:
             print e
@@ -179,7 +206,177 @@ class Restaurants(object):
             print e
             return False
 
+class Dishes(object):
+    def get(self, RestaurantID=None, Name=None):
+        try:
+            if RestaurantID:
+                restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+                dishes = restaurant.dishes
+                if restaurant:
+                    if Name:
+                        dish = dishes.query.get(name = Name)
+                        return serializer("dish", dish)
+                    else:
+                        dishes = dishes.query.find()
+                        return serializer("dish", dishes, multi=True)
+                else:
+                    if Name:
+                        return {}
+                    else:
+                        return []
+            else:
+                if Name:
+                    dishes = Dish.query.get(name = Name)
+                else:
+                    dishes = Dish.query.find()
+
+                dishes = serializer("dish", dishes, multi=True)
+                return dishes
+
+        except Exception as e:
+            print "Dishes Get"
+            print e
+            if RestaurantID and Name:
+                return {}
+            else:
+                return []
+
+    def insert(self, dish):
+        try:
+            RestaurantID = dish.get("restaurant", None)
+            if RestaurantID:
+                new_ingredients = []
+                restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+                if restaurant:
+                    name = dish.get("name", None)
+                    cost = dish.get("cost", -1.0)
+                    calories = dish.get("calories", -1)
+                    new_dish = Dish(restaurant=restaurant, name=name, rate=-1, cost=cost, calories=calories)
+                    ingredients = dish.get("ingredients", [])
+                    for ingredient in ingredients:
+                        name =  ingredient.get("name", None)
+                        if name:
+                            i = Ingredient.query.get(name = ingredient)
+                            if not i:
+                                type=ingredient.get("type", "")
+                                allergens=ingredient.get("allergens", [])
+                                description=ingredient.get("description", "")
+                                if type:
+                                    try:
+                                        ["meat", "fish", "vegetarian"].index(type)
+                                        i = Ingredient(name=name, type=str(type), allergens=allergens, description=description)
+                                    except Exception as e:
+                                        print "Dishes Insert"
+                                        print e
+                                        return False
+                            new_ingredients.append(i)
+                    new_dish.ingredients = new_ingredients
+                    session.flush()
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        except Exception as e:
+            print "Dishes Insert"
+            print e
+            return False
+
+    def update(self):
+        pass
+
+    def remove(self, RestaurantID = None, DishName = None):
+        try:
+            if RestaurantID:
+                restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+                if restaurant:
+                    dishes = restaurant.dishes
+                    if DishName:
+                        dish = dishes.query.get(name = DishName)
+                        if dish:
+                            dish.delete()
+                        else:
+                            return False
+                    else:
+                        for dish in dishes:
+                            dish.delete()
+            else:
+                dishes = Dish.query.find()
+                for dish in dishes:
+                    dish.delete()
+            session.flush()
+            return True
+        except Exception as e:
+            print "Dish Remove"
+            print e
+            return False
+
+class Ingredients(object):
+    def get(self, name=None, RestaurantID=None, Dish=None, type=None):
+        if name:
+            ingredient = Ingredient.query.get(name = name)
+        else:
+            if RestaurantID:
+                restaurant = Restaurant.query.get(restaurant_id = RestaurantID)
+                if restaurant:
+                    dishes = restaurant.dishes
+                    if Dish:
+                        dish = dishes.query.get(name = Dish)
+                        ingredients = dish.ingredients
+                        return serializer("ingredient", ingredients, multi=True)
+                    else:
+                        dishes = dishes.query.find()
+                        ingredient_list = []
+                        for dish in dishes:
+                            ingredient_list.extend(dish.ingredients)
+                        print ingredient_list
+                        return serializer("ingredient", ingredient_list, multi=True)
+            else:
+                ingredients = Ingredient.query.find()
+                return serializer("ingredient", ingredients, multi=True)
+
+    def insert(self, ingredient):
+        try:
+            name = ingredient.get("name", None)
+            t = ingredient.get("type", None)
+            allergens = ingredient.get("allergens", [])
+            description = ingredient.get("description", "")
+            if (t == "meat" or t == "fish" or t == "vegetarian") and name:
+                Ingredient(name = name, type = t, allergens = allergens, description=description)
+                session.flush()
+                return True
+            return False
+        except Exception as e:
+            print "Ingredients Insert"
+            print "aqui"
+            print e
+            return False
+
+    def update(self):
+        pass
+
+    def remove(self, ingredient_name=None):
+        try:
+            if ingredient_name:
+                ingredient = Ingredient.query.get(name=ingredient_name)
+                if ingredient:
+                    ingredient.delete()
+                else:
+                    return False
+            else:
+                ingredients = Ingredient.query.find()
+                for ingredient in ingredients:
+                    ingredient.delete()
+            session.flush()
+            return True
+        except Exception as e:
+            print "Ingredient Remove"
+            print e
+            return False
+
 class Database(object):
     def __init__(self):
         self.restaurants = Restaurants()
         self.users = Users()
+        self.dishes = Dishes()
+        self.ingredients = Ingredients()
