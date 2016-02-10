@@ -1,5 +1,5 @@
-from classes import User, Restaurant, Dish, Ingredient
-from classes import engine
+from models import User, Restaurant, Dish, Ingredient
+from models import engine
 from sqlalchemy.orm import sessionmaker
 
 Session = sessionmaker(bind=engine)
@@ -11,27 +11,23 @@ class Users(object):
     def get(self, username = None):
         try:
             if username:
+                data = {}
                 u = session.query(User).\
                             filter(User.username == username).\
                             one_or_none()
                 if u:
-                    return u.json()
-                else:
-                    return {}
+                    data = u.json()
             else:
-                users = []
+                data = []
                 u = session.query(User).all()
                 for user in u:
-                    users.append(user.json())
-                return users
+                    data.append(user.json())
         except Exception as e:
             if DEBUG:
                 print "Users Get"
                 print e
-            if username:
-                return {}
-            else:
-                return []
+        session.commit()
+        return data
 
     def insert(self, user): #por opcao para inserir varios de seguida
         if user:
@@ -48,6 +44,7 @@ class Users(object):
                     if DEBUG:
                         print "Users Insert"
                         print e
+                    session.commit()
         return False
 
     def update(self, username, data):
@@ -66,9 +63,10 @@ class Users(object):
             if DEBUG:
                 print "Users Update"
                 print e
+        session.commit()
         return False
 
-    def remove(self, username = None): #remover varios
+    def remove(self, username=None): #remover varios
         try:
             if username:
                 u = session.query(User).filter(User.username == username).one_or_none()
@@ -86,29 +84,30 @@ class Users(object):
             if DEBUG:
                 print "Users Remove"
                 print e
-            return False
+        session.commit()
+        return False
 
 class Restaurants(object):
     def get(self, name = None):
         try:
             if name:
+                data = {}
                 r = session.query(Restaurant).\
                             filter(Restaurant.name == name).\
                             one_or_none()
                 if r:
-                    return r.json()
-                else:
-                    return {}
+                    data = r.json()
             else:
-                restaurants = []
+                data = []
                 r = session.query(Restaurant).all()
                 for restaurant in r:
-                    restaurants.append(restaurant.json())
-                return restaurants
+                    data.append(restaurant.json())
         except Exception as e:
             if DEBUG:
                 print "Restaurants Get"
                 print e
+        session.commit()
+        return data
 
     def insert(self, restaurant):
         if restaurant:
@@ -130,6 +129,7 @@ class Restaurants(object):
                     if DEBUG:
                         print "Restaurants Insert"
                         print e
+        session.commit()
         return False
 
     def update(self, user, data):
@@ -145,6 +145,7 @@ class Restaurants(object):
             if DEBUG:
                 print "Restaurants Update"
                 print e
+        session.commit()
         return False
 
     def add_manager(self, restaurant, uses):
@@ -158,11 +159,13 @@ class Restaurants(object):
                         one_or_none()
             if r and u:
                 u.restaurant = r
+                session.commit()
                 return True
 
         except Exception as e:
             if DEBUG:
                 print "Restaurants Add Manager"
+        session.commit()
         return False
 
     def remove_manager(self, restaurant, uses):
@@ -176,26 +179,41 @@ class Restaurants(object):
                         one_or_none()
             if r and u and (r in r.managers):
                 r.managers.remove(u)
+                session.commit()
+                return True
         except Exception as e:
             if DEBUG:
                 print "Restaurants Remove Manager"
+        session.commit()
         return False
 
-    def remove(self, restaurant = None):
+    def remove(self, name=None):
         try:
-            if restaurant:
-                r = session.query(Restaurant).\
-                            filter(Restaurant.name == restaurant).\
-                            one_or_none()
+            if name:
+                r = session.query(Restaurant, Dishes).\
+                            filter(Restaurant.name == name).\
+                            join(Dish.restaurant_id == Restaurant.id).\
+                            all()
+
+                print r
                 if r:
+                    r = r[0]
+                    print r
                     for dish in r.dishes:
                         session.delete(dish)
                     session.delete(r)
                 else:
+                    session.commit()
                     return False
             else:
-                r = session.query(Restaurant).all()
+                r = session.query(Restaurant).\
+                            all()
                 for restaurant in r:
+                    d = session.query(Dish).\
+                                filter(Dish.restaurant_id == restaurant.id).\
+                                all()
+                    for dish in d:
+                        session.delete(dish)
                     session.delete(restaurant)
             session.commit()
             return True
@@ -203,47 +221,44 @@ class Restaurants(object):
             if DEBUG:
                 print "Restaurant Remove"
                 print e
-            return False
+        session.commit()
+        return False
 
 class Dishes(object):
     def get(self, restaurant = None, name = None):
-        if restaurant:
-            if dish:
-                d = session.query(Restaurant, Dish).\
-                            filter(Restaurant.name == restaurant).\
-                            join(Restaurant.dishes).\
-                            filter(Dish.name == dish).\
-                            one_or_none()
-                if d:
-                    d = d[1]
-                    return d.json()
+        try:
+            if restaurant:
+                if name:
+                    data = {}
+                    d = session.query(Restaurant, Dish).\
+                                filter(Restaurant.name == restaurant).\
+                                join(Restaurant.dishes).\
+                                filter(Dish.name == name).\
+                                one_or_none()
+                    if d:
+                        data = d[1].json()
                 else:
-                    return {}
+                    data = []
+                    d = session.query(Restaurant, Dish).\
+                                filter(Restaurant.name == restaurant).\
+                                join(Restaurant.dishes).\
+                                all()
+                    if d:
+                        for dish in d:
+                            data.append(dish[1].json())
             else:
-                d = session.query(Restaurant, Dish).\
-                            filter(Restaurant.name == restaurant).\
-                            join(Restaurant.dishes).\
-                            all()
-                if d:
-                    d = d[1]
-                    dishes = []
-                    for dish in d:
-                        dishes.append(dish.json())
-                    return dishes
+                data = []
+                if name:
+                    d = session.query(Dish).filter(Dish.name == name)
                 else:
-                    return []
-        else:
-            if name:
-                dishes = []
-                for dish in session.query(Dish).filter(Dish.name == name):
-                    dishes.append(dish.json())
-                return dishes
-            else:
-                dishes = []
-                d = session.query(Dish).all()
+                    d = session.query(Dish).all()
                 for dish in d:
-                    dishes.append(dish.json())
-                return dishes
+                    data.append(dish.json())
+        except Exception as e:
+            print "Dishes Get"
+            print e
+        session.commit()
+        return data
 
     def insert(self, restaurant, dish):
         if restaurant and dish:
@@ -266,7 +281,7 @@ class Dishes(object):
                 except Exception as e:
                     print "Dishes Insert"
                     print e
-
+        session.commit()
         return False
 
     def update(self, restaurant, dish, data):
@@ -293,6 +308,7 @@ class Dishes(object):
             if DEBUG:
                 print "Dishes Update"
                 print e
+        session.commit()
         return False
 
     def add_ingredient(self, restaurant, dish, ingredient, new = False):
@@ -313,12 +329,15 @@ class Dishes(object):
                             i = Ingredient(name = name, type = type)
                             session.add(i)
                         else:
+                            print "meh"
+                            session.commit()
                             return False
                     else:
                         i = session.query(Ingredient).\
                                     filter(Ingredient.name == ingredient).\
                                     one_or_none()
                         if not i:
+                            session.commit()
                             return False
                     d.ingredients.append(i)
                     session.commit()
@@ -326,6 +345,7 @@ class Dishes(object):
             except Exception as e:
                 print "Dishes Add Ingredient"
                 print e
+                session.commit()
         return False
 
     def remove_ingredient(self, restaurant, dish, ingredient):
@@ -353,21 +373,31 @@ class Dishes(object):
             except Exception as e:
                 print "Dishes Remove Ingredient"
                 print e
+        session.commit()
         return False
 
-    def remove(self, restaurant = None, dish = None):
+    def remove(self, restaurant=None, name=None):
         try:
-            if restaurant and dish:
-                d = session.query(Restaurant, Dish).\
-                            filter(Restaurant.name == restaurant).\
-                            join(Restaurant.dishes).\
-                            filter(Dish.name == dish).\
-                            one_or_none()
-                if d:
-                    d = d[1]
-                    session.delete(d)
+            if restaurant:
+                if name:
+                    d = session.query(Restaurant, Dish).\
+                                filter(Restaurant.name == restaurant).\
+                                join(Restaurant.dishes).\
+                                filter(Dish.name == name).\
+                                one_or_none()
+                    if d:
+                        d = d[1]
+                        session.delete(d)
+                    else:
+                        session.commit()
+                        return False
                 else:
-                    return False
+                    d = session.query(Restaurant, Dish).\
+                                filter(Restaurant.name == restaurant).\
+                                join(Restaurant.dishes).\
+                                all()
+                    for dish in d:
+                        session.delete(dish[1])
             else:
                 d = session.query(Dish).all()
                 for dish in d:
@@ -378,37 +408,40 @@ class Dishes(object):
             if DEBUG:
                 print "Dish Remove"
                 print e
-            return False
+        session.commit()
+        return False
 
 class Ingredients(object):
     def get(self, name = None, restaurant = None, dish = None):
-        if name:
-            i = session.query(Ingredient).filter(Ingredient.name == name).one_or_none()
-            if i:
-                return i.json()
-            else:
-                return {}
-        else:
-            if restaurant and dish:
-                d = session.query(Restaurant, Dish).\
-                            filter(Restaurant.name == restaurant).\
-                            join(Restaurant.dishes).\
-                            filter(Dish.name == dish).\
-                            one_or_none()
+        try:
+            if name:
+                data = {}
+                i = session.query(Ingredient).filter(Ingredient.name == name).one_or_none()
+                if i:
+                    data = i.json()
 
-                if d:
-                    d = d[1]
-                    ingredients = []
-                    for ingredient in d.ingredients:
-                        ingredients.append(ingredient.json())
-                    return ingredients
             else:
-                i = session.query(Ingredient).all()
-                ingredients = []
-                for ingredient in i:
-                    ingredients.append(ingredient.json())
-                return ingredients
-            return []
+                data = []
+                if restaurant and dish:
+                    d = session.query(Restaurant, Dish).\
+                                filter(Restaurant.name == restaurant).\
+                                join(Restaurant.dishes).\
+                                filter(Dish.name == dish).\
+                                one_or_none()
+
+                    if d:
+                        d = d[1]
+                        for ingredient in d.ingredients:
+                            data.append(ingredient.json())
+                else:
+                    i = session.query(Ingredient).all()
+                    for ingredient in i:
+                        data.append(ingredient.json())
+        except Exception as e:
+            print "Ingredients Get"
+            print e
+        session.commit()
+        return data
 
     def insert(self, ingredient):
         if ingredient:
@@ -424,6 +457,7 @@ class Ingredients(object):
                 except Exception as e:
                     print "Ingredient Insert"
                     print e
+        session.commit()
         return False
 
     def update(self, user, data):
@@ -439,13 +473,14 @@ class Ingredients(object):
             if DEBUG:
                 print "Ingredients Update"
                 print e
+        session.commit()
         return False
 
-    def remove(self, ingredient = None):
+    def remove(self, name=None):
         try:
-            if ingredient:
+            if name:
                 i = session.query(Ingredient).\
-                            filter(Ingredient.name == ingredient).\
+                            filter(Ingredient.name == name).\
                             one_or_none()
                 if i:
                     session.delete(i)
@@ -462,7 +497,8 @@ class Ingredients(object):
             if DEBUG:
                 print "Ingredients Remove"
                 print e
-            return False
+
+        return False
 
 class Database(object):
     def __init__(self):

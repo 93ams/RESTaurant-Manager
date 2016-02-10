@@ -3,8 +3,8 @@ from sqlalchemy import Table, Column, and_
 from sqlalchemy import Integer, String, Float
 from sqlalchemy import ForeignKey, ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
-
+from sqlalchemy.orm import relationship
+import os
 Base = declarative_base()
 
 class User(Base):
@@ -91,6 +91,6 @@ class Ingredient(Base):
         }
         return doc
 
-
-engine = create_engine('sqlite:///../sqlite/sqlite.db', echo = False)
+os.remove("./sqlite/sqlite.db")
+engine = create_engine('sqlite:///sqlite/sqlite.db', echo = False)
 Base.metadata.create_all(engine)
